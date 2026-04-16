@@ -1,0 +1,1887 @@
+-- Rest In Peace My Granny She Got Hit By A Bazooka --
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TeleportService = game:GetService("TeleportService")
+local Debris = game:GetService("Debris")
+local Lighting = game:GetService("Lighting")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+local connections = {}
+
+-- =====================
+-- UTILITY
+-- =====================
+
+local function getCharacter() return LocalPlayer.Character end
+local function getHumanoid()
+	local c = getCharacter()
+	return c and c:FindFirstChildOfClass("Humanoid")
+end
+local function getRoot()
+	local c = getCharacter()
+	return c and c:FindFirstChild("HumanoidRootPart")
+end
+
+-- =====================
+-- WINDOW
+-- =====================
+
+local Window = Rayfield:CreateWindow({
+	Name = "afsf",
+	LoadingTitle = "dssf",
+	LoadingSubtitle = "dfsdafs",
+	ConfigurationSaving = {
+		Enabled = true,
+		FolderName = "dfhd",
+		FileName = "Config"
+	},
+	Discord = { Enabled = false },
+	KeySystem = false,
+})
+
+local Tabs = {
+	Aimbot    = Window:CreateTab("Aimbot & Precision",    "crosshair"),
+	Visuals   = Window:CreateTab("Visuals & ESP",         "eye"),
+	Movement  = Window:CreateTab("Movement & Mobility",   "person-standing"),
+	Protection= Window:CreateTab("Protection & Survival", "shield"),
+	Extras    = Window:CreateTab("UI & Extras",           "settings"),
+	Yield     = Window:CreateTab("Scripts",               "code"),
+	Ui        = Window:CreateTab("UI Settings (Broken)",  "paintbrush"),
+	Panic     = Window:CreateTab("Panic",                 "shield-alert"),
+	Birth     = Window:CreateTab("Matthew's Birthday",    "cake"),
+}
+
+-- =====================
+-- AIMBOT SETTINGS
+-- =====================
+
+local aimDeadCheck    = true
+local aimWallCheck    = true
+local aimPriority     = "Distance"
+local aimFOV          = 500
+local aimMaxDistance  = 0
+
+local function isValidTarget(player)
+	if player == LocalPlayer then return false end
+	local char = player.Character
+	if not char then return false end
+	local humanoid = char:FindFirstChildOfClass("Humanoid")
+	local head = char:FindFirstChild("Head")
+	if not humanoid or not head then return false end
+	if aimDeadCheck and humanoid.Health <= 0 then return false end
+	if aimMaxDistance > 0 then
+		local myRoot = getRoot()
+		if myRoot and (myRoot.Position - head.Position).Magnitude > aimMaxDistance then
+			return false
+		end
+	end
+	if aimWallCheck then
+		-- Updated: use RaycastParams instead of deprecated FindPartOnRayWithIgnoreList
+		local origin = Camera.CFrame.Position
+		local direction = (head.Position - origin).Unit * 500
+		local params = RaycastParams.new()
+		params.FilterDescendantsInstances = { getCharacter() }
+		params.FilterType = Enum.RaycastFilterType.Exclude
+		local result = workspace:Raycast(origin, direction, params)
+		if result and result.Instance and result.Instance:IsDescendantOf(char) then
+			return true
+		else
+			return false
+		end
+	end
+	return true
+end
+
+local function getClosestPlayer(fov)
+	local closest, closestValue = nil, math.huge
+	local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+	for _, player in ipairs(Players:GetPlayers()) do
+		if not isValidTarget(player) then continue end
+		local head = player.Character.Head
+		local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
+		if not onScreen then continue end
+		local dist = (center - Vector2.new(pos.X, pos.Y)).Magnitude
+		if dist > (fov or math.huge) then continue end
+		local value = aimPriority == "Distance" and dist or player.Character.Humanoid.Health
+		if value < closestValue then
+			closestValue = value
+			closest = player
+		end
+	end
+	return closest
+end
+
+-- =====================
+-- AIMBOT TAB
+-- =====================
+
+Tabs.Aimbot:CreateSection("Aimbot Settings")
+
+local aimbotEnabled    = false
+local aimbotMode       = "Rage"
+local aimbotLock       = "Head"
+local aimbotAutoFire   = false
+local aimbotPrediction = false
+local aimbotSensitivity = 1
+
+Tabs.Aimbot:CreateToggle({ Name = "Enable Aimbot", CurrentValue = false, Flag = "AimbotToggle",
+	Callback = function(v) aimbotEnabled = v end })
+
+Tabs.Aimbot:CreateDropdown({ Name = "Aimbot Mode", Options = {"Rage","Legit"}, CurrentOption = {"Rage"}, Flag = "AimbotMode",
+	Callback = function(o) aimbotMode = o[1] end })
+
+Tabs.Aimbot:CreateDropdown({ Name = "Lock Target", Options = {"Head","Torso"}, CurrentOption = {"Head"}, Flag = "AimbotLock",
+	Callback = function(o) aimbotLock = o[1] end })
+
+Tabs.Aimbot:CreateToggle({ Name = "Auto-Fire", CurrentValue = false, Flag = "AimbotAutoFire",
+	Callback = function(v) aimbotAutoFire = v end })
+
+Tabs.Aimbot:CreateToggle({ Name = "Movement Prediction", CurrentValue = false, Flag = "AimbotPrediction",
+	Callback = function(v) aimbotPrediction = v end })
+
+Tabs.Aimbot:CreateSlider({ Name = "Sensitivity (Legit)", Range = {1,50}, Increment = 1, Suffix = "", CurrentValue = 10, Flag = "AimbotSensitivity",
+	Callback = function(v) aimbotSensitivity = v / 10 end })
+
+Tabs.Aimbot:CreateSection("Targeting Settings")
+
+Tabs.Aimbot:CreateDropdown({ Name = "Priority", Options = {"Distance","Health"}, CurrentOption = {"Distance"}, Flag = "AimPriority",
+	Callback = function(o) aimPriority = o[1] end })
+
+Tabs.Aimbot:CreateSlider({ Name = "Max Distance (0 = unlimited)", Range = {0,1000}, Increment = 10, Suffix = " studs", CurrentValue = 0, Flag = "AimMaxDistance",
+	Callback = function(v) aimMaxDistance = v end })
+
+Tabs.Aimbot:CreateToggle({ Name = "Dead Check", CurrentValue = true, Flag = "AimDeadCheck",
+	Callback = function(v) aimDeadCheck = v end })
+
+Tabs.Aimbot:CreateToggle({ Name = "Wall Check", CurrentValue = true, Flag = "AimWallCheck",
+	Callback = function(v) aimWallCheck = v end })
+
+Tabs.Aimbot:CreateSection("FOV Settings")
+
+Tabs.Aimbot:CreateSlider({ Name = "Aimbot FOV", Range = {100,1000}, Increment = 10, Suffix = " px", CurrentValue = 500, Flag = "AimFOV",
+	Callback = function(v) aimFOV = v end })
+
+local fovCircleEnabled = false
+local fovCircleSize    = 100
+local fovCircleRainbow = false
+local fovCircle = Drawing.new("Circle")
+fovCircle.Visible = false; fovCircle.Thickness = 2
+fovCircle.Color = Color3.new(1,1,1); fovCircle.Transparency = 1; fovCircle.NumSides = 64
+
+Tabs.Aimbot:CreateToggle({ Name = "FOV Circle", CurrentValue = false, Flag = "FOVCircleToggle",
+	Callback = function(v) fovCircleEnabled = v; fovCircle.Visible = v end })
+
+Tabs.Aimbot:CreateSlider({ Name = "FOV Circle Size", Range = {50,500}, Increment = 10, Suffix = " px", CurrentValue = 100, Flag = "FOVCircleSize",
+	Callback = function(v) fovCircleSize = v end })
+
+Tabs.Aimbot:CreateToggle({ Name = "Rainbow FOV", CurrentValue = false, Flag = "FOVCircleRainbow",
+	Callback = function(v) fovCircleRainbow = v end })
+
+Tabs.Aimbot:CreateSection("Silent Aim")
+
+local silentAimEnabled  = false
+local silentAimHitchance = 50
+
+Tabs.Aimbot:CreateToggle({ Name = "Silent Aim", CurrentValue = false, Flag = "SilentAimToggle",
+	Callback = function(v) silentAimEnabled = v end })
+
+Tabs.Aimbot:CreateSlider({ Name = "Silent Aim Hitchance", Range = {0,100}, Increment = 1, Suffix = "%", CurrentValue = 50, Flag = "SilentAimHitchance",
+	Callback = function(v) silentAimHitchance = v end })
+
+Tabs.Aimbot:CreateSection("TriggerBot")
+
+local triggerBotEnabled  = false
+local triggerBotDelay    = 0
+local triggerBotLastShot = 0
+
+Tabs.Aimbot:CreateToggle({ Name = "TriggerBot", CurrentValue = false, Flag = "TriggerBotToggle",
+	Callback = function(v) triggerBotEnabled = v end })
+
+Tabs.Aimbot:CreateSlider({ Name = "TriggerBot Delay", Range = {0,500}, Increment = 10, Suffix = "ms", CurrentValue = 0, Flag = "TriggerBotDelay",
+	Callback = function(v) triggerBotDelay = v / 1000 end })
+
+-- Aimbot Loop
+connections["Aimbot"] = RunService:BindToRenderStep("Aimbot", Enum.RenderPriority.Camera.Value, function(dt)
+	if not aimbotEnabled then return end
+	local closest = getClosestPlayer(aimFOV)
+	if not (closest and closest.Character) then return end
+	local partName = aimbotLock == "Head" and "Head" or "UpperTorso"
+	local targetPart = closest.Character:FindFirstChild(partName)
+	if not targetPart then return end
+	local prediction = aimbotPrediction and targetPart.AssemblyLinearVelocity * 0.1 or Vector3.zero
+	local targetPos = targetPart.Position + prediction
+	if aimbotMode == "Rage" then
+		Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, targetPos)
+	elseif aimbotMode == "Legit" then
+		local currentLook = Camera.CFrame.LookVector
+		local targetLook = (targetPos - Camera.CFrame.Position).Unit
+		local smooth = math.clamp(aimbotSensitivity * dt * 10, 0.01, 0.3)
+		local newLook = currentLook:Lerp(targetLook, smooth)
+		Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, Camera.CFrame.Position + newLook)
+	end
+	if aimbotAutoFire then
+		local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+		if tool then tool:Activate() end
+	end
+end)
+
+pcall(function()
+	local utility = require(game:GetService("ReplicatedStorage").Modules.Utility)
+	local oldRaycast = utility.Raycast
+	utility.Raycast = function(...)
+		local args = {...}
+		if silentAimEnabled and #args >= 3 and math.random(100) <= silentAimHitchance then
+			local closest = getClosestPlayer(aimFOV)
+			if closest and closest.Character and closest.Character:FindFirstChild("Head") then
+				args[3] = closest.Character.Head.Position
+			end
+		end
+		return oldRaycast(table.unpack(args))
+	end
+end)
+
+connections["TriggerBot"] = RunService.Heartbeat:Connect(function()
+	if not triggerBotEnabled then return end
+	if tick() - triggerBotLastShot < triggerBotDelay then return end
+	local mouse = LocalPlayer:GetMouse()
+	local target = mouse.Target
+	if target and target.Parent then
+		local humanoid = target.Parent:FindFirstChildOfClass("Humanoid")
+		if humanoid and humanoid.Health > 0 then
+			local player = Players:GetPlayerFromCharacter(target.Parent)
+			if player and player ~= LocalPlayer then
+				triggerBotLastShot = tick()
+				local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+				if tool then tool:Activate() end
+			end
+		end
+	end
+end)
+
+connections["FOVCircle"] = RunService.RenderStepped:Connect(function()
+	if fovCircleEnabled then
+		fovCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+		fovCircle.Radius = fovCircleSize
+		fovCircle.Visible = true
+		if fovCircleRainbow then fovCircle.Color = Color3.fromHSV(tick() % 5 / 5, 1, 1) end
+	else
+		fovCircle.Visible = false
+	end
+end)
+
+-- =====================
+-- VISUALS TAB
+-- =====================
+
+local playerESPEnabled  = false
+local boxESPEnabled     = false
+local chamsESPEnabled   = false
+local playerESPName     = true
+local playerESPDistance = true
+local playerESPHealth   = true
+local playerESPWeapon   = true
+local rainbowModeEnabled = false
+local deadESPEnabled    = true
+local skeletonESPEnabled = false
+local skeletonESPTracers = false
+
+local espBoxes = {}; local espChams = {}; local espTexts = {}; local skeletonLines = {}
+
+local function cleanupPlayerESP(player)
+	if espBoxes[player]  then pcall(function() espBoxes[player]:Remove() end);  espBoxes[player]  = nil end
+	if espChams[player]  then pcall(function() espChams[player]:Destroy() end);  espChams[player]  = nil end
+	if espTexts[player]  then pcall(function() espTexts[player]:Remove() end);  espTexts[player]  = nil end
+	if skeletonLines[player] then
+		if skeletonLines[player].lines then
+			for _, l in pairs(skeletonLines[player].lines) do pcall(function() l:Remove() end) end
+		end
+		if skeletonLines[player].tracer then pcall(function() skeletonLines[player].tracer:Remove() end) end
+		skeletonLines[player] = nil
+	end
+end
+
+local function createPlayerESP(player)
+	if player == LocalPlayer or not player.Character then return end
+	cleanupPlayerESP(player)
+	local box = Drawing.new("Square")
+	box.Visible = false; box.Color = Color3.new(1,1,1); box.Thickness = 2; box.Filled = false; box.Transparency = 1
+	espBoxes[player] = box
+	local cham = Instance.new("Highlight")
+	cham.Name = "ESP_Cham_" .. player.Name; cham.Parent = game.CoreGui
+	cham.Adornee = player.Character; cham.FillTransparency = 0.5; cham.OutlineTransparency = 0
+	cham.FillColor = Color3.new(1,1,1); cham.OutlineColor = Color3.new(1,1,1); cham.Enabled = false
+	espChams[player] = cham
+	local text = Drawing.new("Text")
+	text.Visible = false; text.Color = Color3.new(1,1,1); text.Size = 16
+	text.Center = true; text.Outline = true; text.Transparency = 1; text.Font = 2
+	espTexts[player] = text
+end
+
+Tabs.Visuals:CreateSection("Player ESP")
+
+Tabs.Visuals:CreateToggle({ Name = "Enable Player ESP", CurrentValue = false, Flag = "PlayerESPToggle",
+	Callback = function(v)
+		playerESPEnabled = v
+		if v then
+			for _, p in ipairs(Players:GetPlayers()) do
+				if p ~= LocalPlayer and p.Character then createPlayerESP(p) end
+			end
+		else
+			for p in pairs(espBoxes) do cleanupPlayerESP(p) end
+		end
+	end })
+
+Tabs.Visuals:CreateToggle({ Name = "Box ESP",   CurrentValue = false, Flag = "BoxESPToggle",   Callback = function(v) boxESPEnabled   = v end })
+Tabs.Visuals:CreateToggle({ Name = "Chams ESP", CurrentValue = false, Flag = "ChamsESPToggle", Callback = function(v) chamsESPEnabled = v end })
+
+Tabs.Visuals:CreateSection("ESP Info")
+Tabs.Visuals:CreateToggle({ Name = "Name ESP",           CurrentValue = true,  Flag = "PlayerESPName",     Callback = function(v) playerESPName     = v end })
+Tabs.Visuals:CreateToggle({ Name = "Distance ESP",       CurrentValue = true,  Flag = "PlayerESPDistance", Callback = function(v) playerESPDistance  = v end })
+Tabs.Visuals:CreateToggle({ Name = "Health ESP",         CurrentValue = true,  Flag = "PlayerESPHealth",   Callback = function(v) playerESPHealth    = v end })
+Tabs.Visuals:CreateToggle({ Name = "Equipped Weapon ESP",CurrentValue = true,  Flag = "PlayerESPWeapon",   Callback = function(v) playerESPWeapon    = v end })
+
+Tabs.Visuals:CreateSection("Skeleton & Tracers")
+Tabs.Visuals:CreateToggle({ Name = "Skeleton ESP", CurrentValue = false, Flag = "SkeletonESPToggle",  Callback = function(v) skeletonESPEnabled = v end })
+Tabs.Visuals:CreateToggle({ Name = "Tracers",      CurrentValue = false, Flag = "SkeletonESPTracers", Callback = function(v) skeletonESPTracers  = v end })
+
+Tabs.Visuals:CreateSection("Misc Visuals")
+Tabs.Visuals:CreateToggle({ Name = "Hide Dead ESP",  CurrentValue = true,  Flag = "DeadESPToggle",      Callback = function(v) deadESPEnabled    = v end })
+Tabs.Visuals:CreateToggle({ Name = "Rainbow Mode",   CurrentValue = false, Flag = "RainbowModeToggle",  Callback = function(v) rainbowModeEnabled = v end })
+
+local function setupPlayerESP(player)
+	if player == LocalPlayer then return end
+	player.CharacterAdded:Connect(function()
+		task.wait(0.1)
+		if playerESPEnabled then createPlayerESP(player) end
+	end)
+	player.CharacterRemoving:Connect(function() cleanupPlayerESP(player) end)
+	if player.Character then task.wait(0.1); createPlayerESP(player) end
+end
+
+for _, p in ipairs(Players:GetPlayers()) do setupPlayerESP(p) end
+Players.PlayerAdded:Connect(setupPlayerESP)
+Players.PlayerRemoving:Connect(cleanupPlayerESP)
+
+connections["PlayerESP"] = RunService.Heartbeat:Connect(function()
+	if not playerESPEnabled then return end
+	local hue = tick() % 5 / 5
+	local rainbowColor = Color3.fromHSV(hue, 1, 1)
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player == LocalPlayer then continue end
+		if not player.Character or not player.Character.Parent then cleanupPlayerESP(player); continue end
+		local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+		local root = player.Character:FindFirstChild("HumanoidRootPart")
+		if not humanoid or not root then cleanupPlayerESP(player); continue end
+		if deadESPEnabled and humanoid.Health <= 0 then cleanupPlayerESP(player); continue end
+		if not espBoxes[player] then createPlayerESP(player) end
+		local rootPos, onScreen = Camera:WorldToViewportPoint(root.Position)
+		if onScreen then
+			if espTexts[player] then
+				local t = ""
+				if playerESPName then t = t .. player.Name .. "\n" end
+				if playerESPDistance then
+					local myRoot = getRoot()
+					if myRoot then t = t .. math.floor((myRoot.Position - root.Position).Magnitude) .. " studs\n" end
+				end
+				if playerESPHealth then t = t .. math.floor(humanoid.Health) .. "/" .. humanoid.MaxHealth .. "\n" end
+				if playerESPWeapon then
+					local tool = player.Character:FindFirstChildOfClass("Tool") or player.Backpack:FindFirstChildOfClass("Tool")
+					if tool then t = t .. tool.Name end
+				end
+				espTexts[player].Text = t
+				espTexts[player].Position = Vector2.new(rootPos.X, rootPos.Y - 50)
+				espTexts[player].Visible = true
+				if rainbowModeEnabled then espTexts[player].Color = rainbowColor end
+			end
+			if boxESPEnabled and espBoxes[player] then
+				local minX, minY = math.huge, math.huge
+				local maxX, maxY = -math.huge, -math.huge
+				for _, part in ipairs(player.Character:GetDescendants()) do
+					if part:IsA("BasePart") then
+						local s = part.Size / 2
+						for _, corner in ipairs({
+							part.CFrame * CFrame.new( s.X, s.Y, s.Z),
+							part.CFrame * CFrame.new( s.X, s.Y,-s.Z),
+							part.CFrame * CFrame.new( s.X,-s.Y, s.Z),
+							part.CFrame * CFrame.new( s.X,-s.Y,-s.Z),
+							part.CFrame * CFrame.new(-s.X, s.Y, s.Z),
+							part.CFrame * CFrame.new(-s.X, s.Y,-s.Z),
+							part.CFrame * CFrame.new(-s.X,-s.Y, s.Z),
+							part.CFrame * CFrame.new(-s.X,-s.Y,-s.Z),
+						}) do
+							local pos = Camera:WorldToViewportPoint(corner.Position)
+							minX = math.min(minX, pos.X); maxX = math.max(maxX, pos.X)
+							minY = math.min(minY, pos.Y); maxY = math.max(maxY, pos.Y)
+						end
+					end
+				end
+				espBoxes[player].Size = Vector2.new(maxX - minX, maxY - minY)
+				espBoxes[player].Position = Vector2.new(minX, minY)
+				espBoxes[player].Visible = true
+				if rainbowModeEnabled then espBoxes[player].Color = rainbowColor end
+			end
+		else
+			if espTexts[player] then espTexts[player].Visible = false end
+			if espBoxes[player] then espBoxes[player].Visible = false end
+		end
+		if chamsESPEnabled and espChams[player] then
+			if espChams[player].Adornee ~= player.Character then espChams[player].Adornee = player.Character end
+			espChams[player].Enabled = true
+			if rainbowModeEnabled then espChams[player].FillColor = rainbowColor; espChams[player].OutlineColor = rainbowColor end
+		elseif espChams[player] then
+			espChams[player].Enabled = false
+		end
+	end
+end)
+
+connections["SkeletonESP"] = RunService.Heartbeat:Connect(function()
+	if not skeletonESPEnabled then return end
+	local hue = tick() % 5 / 5
+	local rainbowColor = Color3.fromHSV(hue, 1, 1)
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player == LocalPlayer then continue end
+		if not player.Character or not player.Character.Parent then
+			if skeletonLines[player] then cleanupPlayerESP(player) end; continue
+		end
+		local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+		if not humanoid or (deadESPEnabled and humanoid.Health <= 0) then
+			if skeletonLines[player] then cleanupPlayerESP(player) end; continue
+		end
+		if not skeletonLines[player] then
+			skeletonLines[player] = {lines = {}, tracer = nil}
+			for i = 1, 14 do
+				local line = Drawing.new("Line")
+				line.Visible = false; line.Color = Color3.new(1,1,1); line.Thickness = 2; line.Transparency = 1
+				skeletonLines[player].lines[i] = line
+			end
+		end
+		local char = player.Character
+		local bonePairs = {
+			{char:FindFirstChild("Head"), char:FindFirstChild("UpperTorso")},
+			{char:FindFirstChild("UpperTorso"), char:FindFirstChild("LowerTorso")},
+			{char:FindFirstChild("UpperTorso"), char:FindFirstChild("LeftUpperArm")},
+			{char:FindFirstChild("LeftUpperArm"), char:FindFirstChild("LeftLowerArm")},
+			{char:FindFirstChild("LeftLowerArm"), char:FindFirstChild("LeftHand")},
+			{char:FindFirstChild("UpperTorso"), char:FindFirstChild("RightUpperArm")},
+			{char:FindFirstChild("RightUpperArm"), char:FindFirstChild("RightLowerArm")},
+			{char:FindFirstChild("RightLowerArm"), char:FindFirstChild("RightHand")},
+			{char:FindFirstChild("LowerTorso"), char:FindFirstChild("LeftUpperLeg")},
+			{char:FindFirstChild("LeftUpperLeg"), char:FindFirstChild("LeftLowerLeg")},
+			{char:FindFirstChild("LeftLowerLeg"), char:FindFirstChild("LeftFoot")},
+			{char:FindFirstChild("LowerTorso"), char:FindFirstChild("RightUpperLeg")},
+			{char:FindFirstChild("RightUpperLeg"), char:FindFirstChild("RightLowerLeg")},
+			{char:FindFirstChild("RightLowerLeg"), char:FindFirstChild("RightFoot")},
+		}
+		for i, pair in ipairs(bonePairs) do
+			local a, b = pair[1], pair[2]
+			local line = skeletonLines[player].lines[i]
+			if a and b then
+				local sPos, sOn = Camera:WorldToViewportPoint(a.Position)
+				local ePos, eOn = Camera:WorldToViewportPoint(b.Position)
+				if sOn and eOn and line then
+					line.From = Vector2.new(sPos.X, sPos.Y); line.To = Vector2.new(ePos.X, ePos.Y)
+					line.Visible = true
+					if rainbowModeEnabled then line.Color = rainbowColor end
+				elseif line then line.Visible = false end
+			elseif line then line.Visible = false end
+		end
+		if skeletonESPTracers then
+			local root = char:FindFirstChild("HumanoidRootPart")
+			if root then
+				local rPos, onScreen = Camera:WorldToViewportPoint(root.Position)
+				if onScreen then
+					if not skeletonLines[player].tracer then
+						local tr = Drawing.new("Line")
+						tr.Thickness = 2; tr.Transparency = 1; tr.Color = Color3.new(1,1,1)
+						skeletonLines[player].tracer = tr
+					end
+					local tr = skeletonLines[player].tracer
+					tr.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+					tr.To = Vector2.new(rPos.X, rPos.Y); tr.Visible = true
+					if rainbowModeEnabled then tr.Color = rainbowColor end
+				else
+					if skeletonLines[player].tracer then skeletonLines[player].tracer.Visible = false end
+				end
+			end
+		else
+			if skeletonLines[player] and skeletonLines[player].tracer then skeletonLines[player].tracer.Visible = false end
+		end
+	end
+end)
+
+-- =====================
+-- MINIMAP RADAR
+-- =====================
+
+Tabs.Visuals:CreateSection("Minimap Radar")
+
+local radarEnabled    = false
+local radarSize       = 200
+local radarRange      = 100
+local radarX          = 20
+local radarY          = 20
+local radarShowNames  = true
+local radarShowLines  = false
+local radarRainbow    = false
+
+local radarCircle = Drawing.new("Circle")
+radarCircle.Visible = false; radarCircle.Thickness = 2; radarCircle.Color = Color3.fromRGB(0,0,0)
+radarCircle.Filled = true; radarCircle.Transparency = 0.5; radarCircle.NumSides = 64
+
+local radarBorder = Drawing.new("Circle")
+radarBorder.Visible = false; radarBorder.Thickness = 2; radarBorder.Color = Color3.fromRGB(255,255,255)
+radarBorder.Filled = false; radarBorder.Transparency = 1; radarBorder.NumSides = 64
+
+local radarCenterDot = Drawing.new("Circle")
+radarCenterDot.Visible = false; radarCenterDot.Thickness = 1; radarCenterDot.Color = Color3.fromRGB(0,255,100)
+radarCenterDot.Filled = true; radarCenterDot.Transparency = 1; radarCenterDot.NumSides = 16; radarCenterDot.Radius = 5
+
+local radarLabel = Drawing.new("Text")
+radarLabel.Visible = false; radarLabel.Color = Color3.fromRGB(255,255,255); radarLabel.Size = 14
+radarLabel.Center = true; radarLabel.Outline = true; radarLabel.Transparency = 1; radarLabel.Font = 2; radarLabel.Text = "RADAR"
+
+local radarNorth = Drawing.new("Text")
+radarNorth.Visible = false; radarNorth.Color = Color3.fromRGB(255,50,50); radarNorth.Size = 14
+radarNorth.Center = true; radarNorth.Outline = true; radarNorth.Transparency = 1; radarNorth.Font = 2; radarNorth.Text = "N"
+
+local radarDots = {}; local radarNames = {}; local radarLines = {}
+
+local function getOrCreateDot(index)
+	if not radarDots[index] then
+		local dot = Drawing.new("Circle")
+		dot.Visible = false; dot.Thickness = 1; dot.Color = Color3.fromRGB(255,50,50)
+		dot.Filled = true; dot.Transparency = 1; dot.NumSides = 16; dot.Radius = 5
+		radarDots[index] = dot
+		local name = Drawing.new("Text")
+		name.Visible = false; name.Color = Color3.fromRGB(255,255,255); name.Size = 12
+		name.Center = true; name.Outline = true; name.Transparency = 1; name.Font = 2
+		radarNames[index] = name
+		local line = Drawing.new("Line")
+		line.Visible = false; line.Color = Color3.fromRGB(255,50,50); line.Thickness = 1; line.Transparency = 0.5
+		radarLines[index] = line
+	end
+	return radarDots[index], radarNames[index], radarLines[index]
+end
+
+local function hideDotsFrom(index)
+	for i = index, #radarDots do
+		if radarDots[i]  then radarDots[i].Visible  = false end
+		if radarNames[i] then radarNames[i].Visible = false end
+		if radarLines[i] then radarLines[i].Visible = false end
+	end
+end
+
+Tabs.Visuals:CreateToggle({ Name = "Enable Radar", CurrentValue = false, Flag = "RadarToggle",
+	Callback = function(v)
+		radarEnabled = v
+		radarCircle.Visible = v; radarBorder.Visible = v
+		radarCenterDot.Visible = v; radarLabel.Visible = v; radarNorth.Visible = v
+		if not v then hideDotsFrom(1) end
+		Rayfield:Notify({Title = "Radar", Content = v and "Radar enabled!" or "Radar disabled!", Duration = 2})
+	end })
+
+Tabs.Visuals:CreateToggle({ Name = "Show Player Names on Radar", CurrentValue = true,  Flag = "RadarNamesToggle",  Callback = function(v) radarShowNames = v end })
+Tabs.Visuals:CreateToggle({ Name = "Show Lines to Players",      CurrentValue = false, Flag = "RadarLinesToggle",  Callback = function(v) radarShowLines = v end })
+Tabs.Visuals:CreateToggle({ Name = "Rainbow Radar",              CurrentValue = false, Flag = "RadarRainbowToggle",Callback = function(v) radarRainbow   = v end })
+
+Tabs.Visuals:CreateSlider({ Name = "Radar Size",       Range = {100,400}, Increment = 10, Suffix = " px",    CurrentValue = 200, Flag = "RadarSize",   Callback = function(v) radarSize  = v end })
+Tabs.Visuals:CreateSlider({ Name = "Radar Range",      Range = {50,1000}, Increment = 10, Suffix = " studs", CurrentValue = 100, Flag = "RadarRange",  Callback = function(v) radarRange = v end })
+Tabs.Visuals:CreateSlider({ Name = "Radar Position X", Range = {0,1800},  Increment = 10, Suffix = " px",    CurrentValue = 20,  Flag = "RadarPosX",   Callback = function(v) radarX     = v end })
+Tabs.Visuals:CreateSlider({ Name = "Radar Position Y", Range = {0,900},   Increment = 10, Suffix = " px",    CurrentValue = 20,  Flag = "RadarPosY",   Callback = function(v) radarY     = v end })
+
+connections["Radar"] = RunService.Heartbeat:Connect(function()
+	if not radarEnabled then return end
+	local myRoot = getRoot()
+	if not myRoot then return end
+	local radius = radarSize / 2
+	local centerX = radarX + radius; local centerY = radarY + radius
+	local center = Vector2.new(centerX, centerY)
+	local hue = tick() % 5 / 5
+	local rainbowColor = Color3.fromHSV(hue, 1, 1)
+	radarCircle.Position = center; radarCircle.Radius = radius
+	radarBorder.Position = center; radarBorder.Radius = radius
+	radarBorder.Color = radarRainbow and rainbowColor or Color3.fromRGB(255,255,255)
+	radarCenterDot.Position = center
+	radarLabel.Position = Vector2.new(centerX, radarY + radius * 2 + 5)
+	radarNorth.Position = Vector2.new(centerX, radarY - 16)
+	radarNorth.Color = radarRainbow and rainbowColor or Color3.fromRGB(255,50,50)
+	local myPos = myRoot.Position; local myCFrame = myRoot.CFrame
+	local dotIndex = 1
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player == LocalPlayer then continue end
+		if not player.Character then continue end
+		local root = player.Character:FindFirstChild("HumanoidRootPart")
+		if not root then continue end
+		local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+		local isDead = humanoid and humanoid.Health <= 0
+		local diff = root.Position - myPos
+		local distance = diff.Magnitude
+		if distance > radarRange then continue end
+		local relX = myCFrame.RightVector:Dot(diff)
+		local relZ = myCFrame.LookVector:Dot(diff)
+		local scale = (distance / radarRange) * radius
+		local angle = math.atan2(relX, relZ)
+		local dotPos = Vector2.new(centerX + math.sin(angle) * scale, centerY - math.cos(angle) * scale)
+		local fromCenter = dotPos - center
+		if fromCenter.Magnitude > radius - 6 then dotPos = center + fromCenter.Unit * (radius - 6) end
+		local dot, nameLabel, line = getOrCreateDot(dotIndex)
+		local dotColor = isDead and Color3.fromRGB(100,100,100) or (radarRainbow and rainbowColor or Color3.fromRGB(255,50,50))
+		dot.Position = dotPos; dot.Color = dotColor; dot.Visible = true
+		if radarShowNames then
+			nameLabel.Text = player.Name .. " [" .. math.floor(distance) .. "]"
+			nameLabel.Position = Vector2.new(dotPos.X, dotPos.Y - 14)
+			nameLabel.Color = radarRainbow and rainbowColor or Color3.fromRGB(255,255,255)
+			nameLabel.Visible = true
+		else nameLabel.Visible = false end
+		if radarShowLines then
+			line.From = center; line.To = dotPos; line.Color = dotColor; line.Visible = true
+		else line.Visible = false end
+		dotIndex = dotIndex + 1
+	end
+	hideDotsFrom(dotIndex)
+end)
+
+-- =====================
+-- MOVEMENT TAB
+-- =====================
+
+-- Player Selection
+Tabs.Movement:CreateSection("Player Selection")
+
+local selectedTeleportPlayer = nil
+local teleportOffset = Vector3.new(3, 0, 0)
+local teleportPlayerMap = {}
+local teleportDropdown
+
+local function formatPlayerName(player)
+	local dn, un = player.DisplayName, player.Name
+	if dn == un then return un end
+	local full = dn .. " (" .. un .. ")"
+	if #full > 30 then
+		local maxD = 30 - #un - 3
+		if maxD < 3 then return string.sub(un, 1, 27) .. "..." end
+		return string.sub(dn, 1, maxD) .. ".. (" .. un .. ")"
+	end
+	return full
+end
+
+local function refreshPlayerList()
+	local displayNames = {}
+	teleportPlayerMap = {}
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= LocalPlayer then
+			local formatted = formatPlayerName(player)
+			table.insert(displayNames, formatted)
+			teleportPlayerMap[formatted] = player.Name
+		end
+	end
+	if #displayNames == 0 then
+		if teleportDropdown then teleportDropdown:Refresh({"No players in server"}, true) end
+		selectedTeleportPlayer = nil
+		Rayfield:Notify({Title = "Server", Content = "No players in server!", Duration = 2})
+		return
+	end
+	local prev = selectedTeleportPlayer
+	if teleportDropdown then teleportDropdown:Refresh(displayNames, true) end
+	local found = nil
+	for dn, un in pairs(teleportPlayerMap) do
+		if un == prev then found = dn; break end
+	end
+	if not found then
+		if prev then Rayfield:Notify({Title = "Player Left", Content = prev .. " left!", Duration = 2}) end
+		selectedTeleportPlayer = teleportPlayerMap[displayNames[1]]
+	end
+end
+
+teleportDropdown = Tabs.Movement:CreateDropdown({
+	Name = "Select Player", Options = {"No players in server"}, CurrentOption = {"No players in server"}, Flag = "TeleportPlayerSelect",
+	Callback = function(opt)
+		selectedTeleportPlayer = teleportPlayerMap[opt[1]] or nil
+		if selectedTeleportPlayer then
+			local t = Players:FindFirstChild(selectedTeleportPlayer)
+			if t then Rayfield:Notify({Title = "Selected", Content = t.DisplayName .. " (@" .. t.Name .. ")", Duration = 2}) end
+		end
+	end })
+
+Tabs.Movement:CreateButton({ Name = "Refresh Player List",
+	Callback = function() refreshPlayerList(); Rayfield:Notify({Title = "Refreshed", Content = "Player list refreshed!", Duration = 2}) end })
+
+-- Teleport To Player
+Tabs.Movement:CreateSection("Teleport To Player")
+
+Tabs.Movement:CreateButton({ Name = "Teleport to Player",
+	Callback = function()
+		if not selectedTeleportPlayer then Rayfield:Notify({Title = "Error", Content = "No player selected!", Duration = 2}); return end
+		local t = Players:FindFirstChild(selectedTeleportPlayer)
+		if not t or not t.Character or not t.Character:FindFirstChild("HumanoidRootPart") then
+			Rayfield:Notify({Title = "Error", Content = "Target not available!", Duration = 2}); return
+		end
+		local root = getRoot()
+		if not root then Rayfield:Notify({Title = "Error", Content = "No character!", Duration = 2}); return end
+		root.CFrame = t.Character.HumanoidRootPart.CFrame + teleportOffset
+		Rayfield:Notify({Title = "Teleported", Content = "Teleported to " .. t.DisplayName .. "!", Duration = 2})
+	end })
+
+Tabs.Movement:CreateSlider({ Name = "Teleport Offset", Range = {0,20}, Increment = 1, Suffix = " studs", CurrentValue = 3, Flag = "TeleportOffsetSlider",
+	Callback = function(v) teleportOffset = Vector3.new(v, 0, 0) end })
+
+local teleportFollowEnabled = false
+local teleportFollowConnection = nil
+
+Tabs.Movement:CreateToggle({ Name = "Follow Player", CurrentValue = false, Flag = "TeleportFollowToggle",
+	Callback = function(v)
+		teleportFollowEnabled = v
+		if v then
+			if not selectedTeleportPlayer then
+				Rayfield:Notify({Title = "Error", Content = "No player selected!", Duration = 2})
+				Rayfield.Flags.TeleportFollowToggle:Set(false); return
+			end
+			teleportFollowConnection = RunService.Heartbeat:Connect(function()
+				pcall(function()
+					local t = Players:FindFirstChild(selectedTeleportPlayer)
+					if t and t.Character and t.Character:FindFirstChild("HumanoidRootPart") then
+						local root = getRoot()
+						if root then root.CFrame = t.Character.HumanoidRootPart.CFrame + teleportOffset end
+					end
+				end)
+			end)
+			local t = Players:FindFirstChild(selectedTeleportPlayer)
+			Rayfield:Notify({Title = "Following", Content = "Following " .. (t and t.DisplayName or selectedTeleportPlayer) .. "!", Duration = 2})
+		else
+			if teleportFollowConnection then teleportFollowConnection:Disconnect(); teleportFollowConnection = nil end
+			Rayfield:Notify({Title = "Stopped", Content = "Stopped following!", Duration = 2})
+		end
+	end })
+
+-- *** CLICK TELEPORT ***
+Tabs.Movement:CreateSection("Click Teleport")
+
+local clickTeleportEnabled = false
+local clickTeleportOffset  = Vector3.new(0, 3, 0)  -- slight upward offset to avoid clipping
+local clickTeleportMode    = "Ground"               -- "Ground" or "Part"
+local clickTeleportConnection = nil
+
+local clickIndicator = Drawing.new("Circle")
+clickIndicator.Visible = false; clickIndicator.Thickness = 2
+clickIndicator.Color = Color3.fromRGB(0, 200, 255); clickIndicator.Filled = false
+clickIndicator.Transparency = 1; clickIndicator.NumSides = 32; clickIndicator.Radius = 8
+
+Tabs.Movement:CreateToggle({ Name = "Enable Click Teleport", CurrentValue = false, Flag = "ClickTeleportToggle",
+	Callback = function(v)
+		clickTeleportEnabled = v
+		if v then
+			clickTeleportConnection = UserInputService.InputBegan:Connect(function(input, gpe)
+				if gpe then return end
+				if input.UserInputType ~= Enum.UserInputType.MouseButton1 then return end
+				if not clickTeleportEnabled then return end
+				local root = getRoot()
+				if not root then return end
+				local unitRay = Camera:ScreenPointToRay(input.Position.X, input.Position.Y)
+				local params = RaycastParams.new()
+				params.FilterDescendantsInstances = { getCharacter() }
+				params.FilterType = Enum.RaycastFilterType.Exclude
+				local result = workspace:Raycast(unitRay.Origin, unitRay.Direction * 2000, params)
+				if result then
+					local targetPos = result.Position
+					if clickTeleportMode == "Ground" then
+						targetPos = targetPos + Vector3.new(0, root.Size.Y / 2 + 0.1, 0)
+					else
+						targetPos = targetPos + clickTeleportOffset
+					end
+					root.CFrame = CFrame.new(targetPos, targetPos + Camera.CFrame.LookVector)
+					-- Flash indicator
+					local screenPos = Camera:WorldToViewportPoint(targetPos)
+					clickIndicator.Position = Vector2.new(screenPos.X, screenPos.Y)
+					clickIndicator.Visible = true
+					task.delay(0.3, function() clickIndicator.Visible = false end)
+				end
+			end)
+			Rayfield:Notify({Title = "Click Teleport", Content = "Click anywhere to teleport there!", Duration = 3})
+		else
+			if clickTeleportConnection then clickTeleportConnection:Disconnect(); clickTeleportConnection = nil end
+			clickIndicator.Visible = false
+			Rayfield:Notify({Title = "Click Teleport", Content = "Click teleport disabled!", Duration = 2})
+		end
+	end })
+
+Tabs.Movement:CreateDropdown({ Name = "Click Mode", Options = {"Ground","Offset"}, CurrentOption = {"Ground"}, Flag = "ClickTeleportMode",
+	Callback = function(o) clickTeleportMode = o[1] end })
+
+Tabs.Movement:CreateSlider({ Name = "Height Offset", Range = {0,20}, Increment = 1, Suffix = " studs", CurrentValue = 3, Flag = "ClickTeleportOffset",
+	Callback = function(v) clickTeleportOffset = Vector3.new(0, v, 0) end })
+
+Tabs.Movement:CreateKeybind({ Name = "Click Teleport Toggle Key", CurrentKeybind = "T", HoldToInteract = false, Flag = "ClickTeleportKeybind",
+	Callback = function()
+		clickTeleportEnabled = not clickTeleportEnabled
+		Rayfield.Flags.ClickTeleportToggle:Set(clickTeleportEnabled)
+	end })
+
+-- Teleport Player To Me
+Tabs.Movement:CreateSection("Teleport Player To Me (Client Only)")
+
+Tabs.Movement:CreateButton({ Name = "Teleport Player To Me",
+	Callback = function()
+		if not selectedTeleportPlayer then Rayfield:Notify({Title = "Error", Content = "No player selected!", Duration = 2}); return end
+		local t = Players:FindFirstChild(selectedTeleportPlayer)
+		if not t or not t.Character or not t.Character:FindFirstChild("HumanoidRootPart") then
+			Rayfield:Notify({Title = "Error", Content = "Target not available!", Duration = 2}); return
+		end
+		local myRoot = getRoot()
+		if not myRoot then return end
+		t.Character.HumanoidRootPart.CFrame = myRoot.CFrame + Vector3.new(3, 0, 0)
+		Rayfield:Notify({Title = "Teleported", Content = "Pulled " .. t.DisplayName .. " to you!", Duration = 2})
+	end })
+
+local pullLoopEnabled = false; local pullLoopConnection = nil
+
+Tabs.Movement:CreateToggle({ Name = "Continuously Pull Player To Me", CurrentValue = false, Flag = "PullLoopToggle",
+	Callback = function(v)
+		pullLoopEnabled = v
+		if v then
+			if not selectedTeleportPlayer then
+				Rayfield:Notify({Title = "Error", Content = "No player selected!", Duration = 2})
+				Rayfield.Flags.PullLoopToggle:Set(false); return
+			end
+			pullLoopConnection = RunService.Heartbeat:Connect(function()
+				pcall(function()
+					local t = Players:FindFirstChild(selectedTeleportPlayer)
+					local myRoot = getRoot()
+					if t and t.Character and t.Character:FindFirstChild("HumanoidRootPart") and myRoot then
+						t.Character.HumanoidRootPart.CFrame = myRoot.CFrame + Vector3.new(3, 0, 0)
+					end
+				end)
+			end)
+			local t = Players:FindFirstChild(selectedTeleportPlayer)
+			Rayfield:Notify({Title = "Pulling", Content = "Pulling " .. (t and t.DisplayName or selectedTeleportPlayer) .. "!", Duration = 2})
+		else
+			if pullLoopConnection then pullLoopConnection:Disconnect(); pullLoopConnection = nil end
+			Rayfield:Notify({Title = "Stopped", Content = "Stopped pulling!", Duration = 2})
+		end
+	end })
+
+Tabs.Movement:CreateButton({ Name = "Teleport ALL Players To Me",
+	Callback = function()
+		local myRoot = getRoot()
+		if not myRoot then return end
+		local count = 0
+		for _, player in ipairs(Players:GetPlayers()) do
+			if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+				pcall(function()
+					player.Character.HumanoidRootPart.CFrame = myRoot.CFrame + Vector3.new(math.random(-5,5), 0, math.random(-5,5))
+				end)
+				count = count + 1
+			end
+		end
+		Rayfield:Notify({Title = "Teleported", Content = "Pulled " .. count .. " player(s) to you!", Duration = 2})
+	end })
+
+Players.PlayerAdded:Connect(function() refreshPlayerList() end)
+Players.PlayerRemoving:Connect(function(player)
+	if selectedTeleportPlayer == player.Name then
+		if teleportFollowEnabled and teleportFollowConnection then teleportFollowConnection:Disconnect(); teleportFollowConnection = nil end
+		if pullLoopEnabled and pullLoopConnection then pullLoopConnection:Disconnect(); pullLoopConnection = nil end
+		Rayfield:Notify({Title = "Player Left", Content = player.DisplayName .. " left!", Duration = 3})
+		selectedTeleportPlayer = nil
+	end
+	refreshPlayerList()
+end)
+
+refreshPlayerList()
+
+-- Waypoints
+Tabs.Movement:CreateSection("Waypoints")
+
+local waypoints = {}
+local maxWaypoints = 10
+local selectedWaypoint = nil
+local waypointDropdown = nil
+local waypointNameInput = "Waypoint"
+local selectedSlot = 1
+
+local function getWaypointNames()
+	local names = {}
+	for i = 1, maxWaypoints do
+		if waypoints[i] then
+			local pos = waypoints[i].position
+			names[i] = i .. ": " .. waypoints[i].name .. " (" .. math.floor(pos.X) .. "," .. math.floor(pos.Y) .. "," .. math.floor(pos.Z) .. ")"
+		else
+			names[i] = i .. ": Empty"
+		end
+	end
+	return names
+end
+
+local function refreshWaypointDropdown()
+	if waypointDropdown then waypointDropdown:Refresh(getWaypointNames(), true) end
+end
+
+Tabs.Movement:CreateInput({ Name = "Waypoint Name", PlaceholderText = "Enter waypoint name...", RemoveTextAfterFocusLost = false, Flag = "WaypointNameInput",
+	Callback = function(v) waypointNameInput = v ~= "" and v or "Waypoint" end })
+
+Tabs.Movement:CreateDropdown({ Name = "Save Slot", Options = {"1","2","3","4","5","6","7","8","9","10"}, CurrentOption = {"1"}, Flag = "WaypointSlotDropdown",
+	Callback = function(o) selectedSlot = tonumber(o[1]) end })
+
+Tabs.Movement:CreateButton({ Name = "Save Waypoint To Slot",
+	Callback = function()
+		local root = getRoot()
+		if not root then Rayfield:Notify({Title = "Waypoints", Content = "No character!", Duration = 2}); return end
+		waypoints[selectedSlot] = { position = root.Position, cframe = root.CFrame, name = waypointNameInput }
+		refreshWaypointDropdown()
+		Rayfield:Notify({Title = "Waypoints", Content = "Saved '" .. waypointNameInput .. "' to slot " .. selectedSlot, Duration = 2})
+	end })
+
+Tabs.Movement:CreateButton({ Name = "Clear Slot",
+	Callback = function()
+		if not waypoints[selectedSlot] then Rayfield:Notify({Title = "Waypoints", Content = "Slot already empty!", Duration = 2}); return end
+		local name = waypoints[selectedSlot].name
+		waypoints[selectedSlot] = nil
+		refreshWaypointDropdown()
+		Rayfield:Notify({Title = "Waypoints", Content = "Cleared '" .. name .. "'!", Duration = 2})
+	end })
+
+Tabs.Movement:CreateButton({ Name = "Clear All Waypoints",
+	Callback = function()
+		waypoints = {}; refreshWaypointDropdown()
+		Rayfield:Notify({Title = "Waypoints", Content = "All waypoints cleared!", Duration = 2})
+	end })
+
+Tabs.Movement:CreateSection("Teleport To Waypoint")
+
+waypointDropdown = Tabs.Movement:CreateDropdown({ Name = "Select Waypoint", Options = getWaypointNames(), CurrentOption = {getWaypointNames()[1]}, Flag = "WaypointSelectDropdown",
+	Callback = function(o)
+		local n = tonumber(o[1]:match("^(%d+):"))
+		selectedWaypoint = n
+	end })
+
+Tabs.Movement:CreateButton({ Name = "Teleport To Waypoint",
+	Callback = function()
+		if not selectedWaypoint or not waypoints[selectedWaypoint] then
+			Rayfield:Notify({Title = "Waypoints", Content = "No valid waypoint selected!", Duration = 2}); return
+		end
+		local root = getRoot()
+		if not root then Rayfield:Notify({Title = "Waypoints", Content = "No character!", Duration = 2}); return end
+		root.CFrame = waypoints[selectedWaypoint].cframe
+		Rayfield:Notify({Title = "Waypoints", Content = "Teleported to '" .. waypoints[selectedWaypoint].name .. "'!", Duration = 2})
+	end })
+
+Tabs.Movement:CreateSection("Waypoint Loop")
+
+local waypointLoopEnabled = false
+local waypointLoopDelay   = 2
+local waypointLoopConnection = nil
+
+Tabs.Movement:CreateToggle({ Name = "Loop Through All Waypoints", CurrentValue = false, Flag = "WaypointLoopToggle",
+	Callback = function(v)
+		waypointLoopEnabled = v
+		if v then
+			local hasAny = false
+			for i = 1, maxWaypoints do if waypoints[i] then hasAny = true; break end end
+			if not hasAny then
+				Rayfield:Notify({Title = "Waypoints", Content = "No waypoints saved!", Duration = 2})
+				Rayfield.Flags.WaypointLoopToggle:Set(false); return
+			end
+			local currentIndex = 1
+			waypointLoopConnection = RunService.Heartbeat:Connect(function()
+				if not waypointLoopEnabled then return end
+				local root = getRoot(); if not root then return end
+				local checked = 0
+				while not waypoints[currentIndex] and checked < maxWaypoints do
+					currentIndex = currentIndex % maxWaypoints + 1; checked = checked + 1
+				end
+				if not waypoints[currentIndex] then return end
+				root.CFrame = waypoints[currentIndex].cframe
+				currentIndex = currentIndex % maxWaypoints + 1
+				task.wait(waypointLoopDelay)
+			end)
+			Rayfield:Notify({Title = "Waypoints", Content = "Looping through waypoints!", Duration = 2})
+		else
+			if waypointLoopConnection then waypointLoopConnection:Disconnect(); waypointLoopConnection = nil end
+			Rayfield:Notify({Title = "Waypoints", Content = "Stopped looping!", Duration = 2})
+		end
+	end })
+
+Tabs.Movement:CreateSlider({ Name = "Loop Delay", Range = {1,30}, Increment = 1, Suffix = " sec", CurrentValue = 2, Flag = "WaypointLoopDelay",
+	Callback = function(v) waypointLoopDelay = v end })
+
+-- Waypoint Radar Overlay
+local waypointRadarDots   = {}
+local waypointRadarLabels = {}
+
+connections["WaypointRadar"] = RunService.Heartbeat:Connect(function()
+	if not radarEnabled then return end
+	local myRoot = getRoot(); if not myRoot then return end
+	local radius = radarSize / 2
+	local centerX = radarX + radius; local centerY = radarY + radius
+	local center = Vector2.new(centerX, centerY)
+	local myPos = myRoot.Position; local myCFrame = myRoot.CFrame
+	for i = 1, maxWaypoints do
+		if waypoints[i] then
+			local diff = waypoints[i].position - myPos
+			local distance = diff.Magnitude
+			if distance <= radarRange then
+				local relX = myCFrame.RightVector:Dot(diff)
+				local relZ = myCFrame.LookVector:Dot(diff)
+				local scale = (distance / radarRange) * radius
+				local angle = math.atan2(relX, relZ)
+				local dotPos = Vector2.new(centerX + math.sin(angle) * scale, centerY - math.cos(angle) * scale)
+				local fromCenter = dotPos - center
+				if fromCenter.Magnitude > radius - 6 then dotPos = center + fromCenter.Unit * (radius - 6) end
+				if not waypointRadarDots[i] then
+					local sq = Drawing.new("Square")
+					sq.Filled = true; sq.Color = Color3.fromRGB(255,220,50); sq.Transparency = 1; sq.Size = Vector2.new(8,8); sq.Visible = false
+					waypointRadarDots[i] = sq
+					local wl = Drawing.new("Text")
+					wl.Size = 11; wl.Center = true; wl.Outline = true; wl.Font = 2
+					wl.Color = Color3.fromRGB(255,220,50); wl.Transparency = 1; wl.Visible = false
+					waypointRadarLabels[i] = wl
+				end
+				waypointRadarDots[i].Position = Vector2.new(dotPos.X - 4, dotPos.Y - 4); waypointRadarDots[i].Visible = true
+				waypointRadarLabels[i].Text = waypoints[i].name; waypointRadarLabels[i].Position = Vector2.new(dotPos.X, dotPos.Y - 14); waypointRadarLabels[i].Visible = true
+			else
+				if waypointRadarDots[i] then waypointRadarDots[i].Visible = false end
+				if waypointRadarLabels[i] then waypointRadarLabels[i].Visible = false end
+			end
+		else
+			if waypointRadarDots[i] then waypointRadarDots[i].Visible = false end
+			if waypointRadarLabels[i] then waypointRadarLabels[i].Visible = false end
+		end
+	end
+end)
+
+-- Speed
+Tabs.Movement:CreateSection("Speed")
+
+local speedHackEnabled = false
+local speedHackValue   = 16
+local speedHackMode    = "Heartbeat"
+
+Tabs.Movement:CreateToggle({ Name = "Speed Hack", CurrentValue = false, Flag = "SpeedHackToggle",
+	Callback = function(v)
+		speedHackEnabled = v
+		pcall(function()
+			local humanoid = getHumanoid()
+			if humanoid then humanoid.WalkSpeed = v and speedHackValue or 16 end
+		end)
+	end })
+
+Tabs.Movement:CreateDropdown({ Name = "Speed Mode", Options = {"Heartbeat","Heatseeker","CFrame"}, CurrentOption = {"Heartbeat"}, Flag = "SpeedHackMode",
+	Callback = function(o) speedHackMode = o[1] end })
+
+Tabs.Movement:CreateSlider({ Name = "Walk Speed", Range = {16,500}, Increment = 1, Suffix = " speed", CurrentValue = 16, Flag = "SpeedHackValue",
+	Callback = function(v)
+		speedHackValue = v
+		if speedHackEnabled then pcall(function()
+			local humanoid = getHumanoid()
+			if humanoid then humanoid.WalkSpeed = v end
+		end) end
+	end })
+
+connections["SpeedHack"] = RunService.Heartbeat:Connect(function()
+	if not speedHackEnabled then return end
+	pcall(function()
+		local humanoid = getHumanoid(); local root = getRoot()
+		if not humanoid or not root then return end
+		if speedHackMode == "Heartbeat" then
+			humanoid.WalkSpeed = speedHackValue
+		elseif speedHackMode == "Heatseeker" then
+			humanoid.WalkSpeed = speedHackValue
+			local moveDir = humanoid.MoveDirection
+			if moveDir.Magnitude > 0 then
+				local bv = root:FindFirstChild("SpeedBV") or Instance.new("BodyVelocity")
+				bv.Name = "SpeedBV"; bv.MaxForce = Vector3.new(1e5,0,1e5); bv.Velocity = moveDir * speedHackValue; bv.Parent = root
+			else
+				local bv = root:FindFirstChild("SpeedBV")
+				if bv then bv.Velocity = Vector3.zero end
+			end
+		elseif speedHackMode == "CFrame" then
+			humanoid.WalkSpeed = 16
+			local moveDir = humanoid.MoveDirection
+			if moveDir.Magnitude > 0 then root.CFrame = root.CFrame + moveDir * (speedHackValue / 60) end
+		end
+	end)
+end)
+
+-- Jumping
+Tabs.Movement:CreateSection("Jumping")
+
+local jumpPowerEnabled = false
+local jumpPowerValue   = 50
+
+Tabs.Movement:CreateToggle({ Name = "Jump Power", CurrentValue = false, Flag = "JumpPowerToggle",
+	Callback = function(v)
+		jumpPowerEnabled = v
+		pcall(function()
+			local humanoid = getHumanoid()
+			if humanoid then humanoid.JumpPower = v and jumpPowerValue or 50 end
+		end)
+	end })
+
+Tabs.Movement:CreateSlider({ Name = "Jump Height", Range = {50,500}, Increment = 5, Suffix = " power", CurrentValue = 50, Flag = "JumpPowerValue",
+	Callback = function(v)
+		jumpPowerValue = v
+		if jumpPowerEnabled then pcall(function()
+			local humanoid = getHumanoid(); if humanoid then humanoid.JumpPower = v end
+		end) end
+	end })
+
+Tabs.Movement:CreateToggle({ Name = "Infinite Jump", CurrentValue = false, Flag = "InfiniteJumpToggle",
+	Callback = function(v)
+		if v then
+			connections["InfJump"] = UserInputService.JumpRequest:Connect(function()
+				local humanoid = getHumanoid()
+				if humanoid then humanoid:ChangeState(Enum.HumanoidStateType.Jumping) end
+			end)
+		else
+			if connections["InfJump"] then connections["InfJump"]:Disconnect(); connections["InfJump"] = nil end
+		end
+	end })
+
+Tabs.Movement:CreateToggle({ Name = "Bunny Hop", CurrentValue = false, Flag = "BunnyHopToggle",
+	Callback = function(v)
+		if connections["BunnyHop"] then connections["BunnyHop"]:Disconnect(); connections["BunnyHop"] = nil end
+		if v then
+			connections["BunnyHop"] = RunService.Heartbeat:Connect(function()
+				pcall(function()
+					local humanoid = getHumanoid()
+					if humanoid and humanoid.MoveDirection.Magnitude > 0 and humanoid.FloorMaterial ~= Enum.Material.Air then
+						humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+					end
+				end)
+			end)
+		end
+	end })
+
+connections["JumpPower"] = RunService.Heartbeat:Connect(function()
+	if jumpPowerEnabled then pcall(function()
+		local humanoid = getHumanoid(); if humanoid then humanoid.JumpPower = jumpPowerValue end
+	end) end
+end)
+
+-- Flight
+Tabs.Movement:CreateSection("Flight")
+
+local flyEnabled = false; local flySpeed = 10; local flyBodyVelocity
+
+Tabs.Movement:CreateToggle({ Name = "Fly Hack", CurrentValue = false, Flag = "FlyHackToggle",
+	Callback = function(v)
+		flyEnabled = v
+		if v then
+			local root = getRoot()
+			if root then
+				root.Anchored = false
+				if not flyBodyVelocity then
+					flyBodyVelocity = Instance.new("BodyVelocity")
+					flyBodyVelocity.MaxForce = Vector3.new(4000,4000,4000)
+					flyBodyVelocity.Velocity = Vector3.zero
+					flyBodyVelocity.Parent = root
+				end
+			end
+		else
+			if flyBodyVelocity then flyBodyVelocity:Destroy(); flyBodyVelocity = nil end
+		end
+	end })
+
+Tabs.Movement:CreateSlider({ Name = "Fly Speed", Range = {1,220}, Increment = 1, Suffix = "", CurrentValue = 10, Flag = "FlyHackSpeed",
+	Callback = function(v) flySpeed = v end })
+
+connections["Fly"] = RunService.Heartbeat:Connect(function()
+	if flyEnabled and flyBodyVelocity and flyBodyVelocity.Parent then
+		local moveDir = Vector3.zero
+		if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir += Camera.CFrame.LookVector end
+		if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir -= Camera.CFrame.LookVector end
+		if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir -= Camera.CFrame.RightVector end
+		if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir += Camera.CFrame.RightVector end
+		if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir += Vector3.new(0,1,0) end
+		if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then moveDir -= Vector3.new(0,1,0) end
+		flyBodyVelocity.Velocity = moveDir.Magnitude > 0 and moveDir.Unit * flySpeed or Vector3.zero
+	end
+end)
+
+-- Misc Movement
+Tabs.Movement:CreateSection("Misc Movement")
+
+local noClipEnabled = false
+
+Tabs.Movement:CreateToggle({ Name = "No Clip", CurrentValue = false, Flag = "NoClipToggle",
+	Callback = function(v) noClipEnabled = v end })
+
+connections["NoClip"] = RunService.Stepped:Connect(function()
+	if noClipEnabled then
+		pcall(function()
+			for _, part in ipairs(getCharacter():GetDescendants()) do
+				if part:IsA("BasePart") then part.CanCollide = false end
+			end
+		end)
+	end
+end)
+
+-- Gravity
+Tabs.Movement:CreateSection("Gravity")
+
+local gravityEnabled = false
+local defaultGravity = workspace.Gravity
+
+Tabs.Movement:CreateToggle({ Name = "Custom Gravity", CurrentValue = false, Flag = "GravityToggle",
+	Callback = function(v)
+		gravityEnabled = v
+		if not v then workspace.Gravity = defaultGravity; Rayfield:Notify({Title = "Gravity", Content = "Gravity reset!", Duration = 2}) end
+	end })
+
+Tabs.Movement:CreateSlider({ Name = "Gravity", Range = {0,500}, Increment = 1, Suffix = " rgrav", CurrentValue = 196, Flag = "GravitySlider",
+	Callback = function(v) if gravityEnabled then workspace.Gravity = v end end })
+
+Tabs.Movement:CreateButton({ Name = "Moon Gravity",   Callback = function() gravityEnabled = true; workspace.Gravity = 30;  Rayfield:Notify({Title="Gravity",Content="Moon gravity!",Duration=2}) end })
+Tabs.Movement:CreateButton({ Name = "Zero Gravity",   Callback = function() gravityEnabled = true; workspace.Gravity = 0;   Rayfield:Notify({Title="Gravity",Content="Zero gravity!",Duration=2}) end })
+Tabs.Movement:CreateButton({ Name = "Heavy Gravity",  Callback = function() gravityEnabled = true; workspace.Gravity = 500; Rayfield:Notify({Title="Gravity",Content="Heavy gravity!",Duration=2}) end })
+Tabs.Movement:CreateButton({ Name = "Reset Gravity",  Callback = function() gravityEnabled = false; workspace.Gravity = defaultGravity; Rayfield:Notify({Title="Gravity",Content="Gravity reset!",Duration=2}) end })
+
+-- Fling
+Tabs.Movement:CreateSection("Fling")
+
+local flingForce = 500000
+
+Tabs.Movement:CreateSlider({ Name = "Fling Force", Range = {10000,2000000}, Increment = 10000, Suffix = " force", CurrentValue = 500000, Flag = "FlingForceSlider",
+	Callback = function(v) flingForce = v end })
+
+local function flingPlayer(target)
+	if not target or not target.Character then
+		Rayfield:Notify({Title = "Fling", Content = "Target has no character!", Duration = 2}); return
+	end
+	local targetRoot = target.Character:FindFirstChild("HumanoidRootPart")
+	if not targetRoot then Rayfield:Notify({Title = "Fling", Content = "No HumanoidRootPart!", Duration = 2}); return end
+	local myRoot = getRoot()
+	if not myRoot then return end
+	local originalCFrame = myRoot.CFrame
+	for i = 1, 10 do
+		pcall(function()
+			myRoot.CFrame = targetRoot.CFrame
+			-- Updated: use LinearVelocity instead of deprecated BodyVelocity where possible
+			local bv = Instance.new("BodyVelocity")
+			bv.Velocity = Vector3.new(math.random(-1,1) * flingForce, flingForce, math.random(-1,1) * flingForce)
+			bv.MaxForce = Vector3.new(flingForce, flingForce, flingForce)
+			bv.P = flingForce; bv.Parent = targetRoot
+			Debris:AddItem(bv, 0.1)
+		end)
+		task.wait()
+	end
+	pcall(function() task.wait(0.1); myRoot.CFrame = originalCFrame end)
+	Rayfield:Notify({Title = "Fling", Content = "Flung " .. target.DisplayName .. "!", Duration = 2})
+end
+
+Tabs.Movement:CreateButton({ Name = "Fling Selected Player",
+	Callback = function()
+		if not selectedTeleportPlayer then Rayfield:Notify({Title = "Fling", Content = "No player selected!", Duration = 3}); return end
+		local t = Players:FindFirstChild(selectedTeleportPlayer)
+		if not t then Rayfield:Notify({Title = "Fling", Content = "Player not found!", Duration = 2}); return end
+		flingPlayer(t)
+	end })
+
+Tabs.Movement:CreateButton({ Name = "Fling ALL Players",
+	Callback = function()
+		local myRoot = getRoot(); if not myRoot then return end
+		local count = 0
+		local originalCFrame = myRoot.CFrame
+		for _, player in ipairs(Players:GetPlayers()) do
+			if player ~= LocalPlayer and player.Character then
+				local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
+				if targetRoot then
+					pcall(function()
+						myRoot.CFrame = targetRoot.CFrame
+						local bv = Instance.new("BodyVelocity")
+						bv.Velocity = Vector3.new(math.random(-1,1) * flingForce, flingForce, math.random(-1,1) * flingForce)
+						bv.MaxForce = Vector3.new(flingForce, flingForce, flingForce)
+						bv.P = flingForce; bv.Parent = targetRoot
+						Debris:AddItem(bv, 0.15)
+					end)
+					task.wait(0.05); count = count + 1
+				end
+			end
+		end
+		pcall(function() myRoot.CFrame = originalCFrame end)
+		Rayfield:Notify({Title = "Fling", Content = "Flung " .. count .. " player(s)!", Duration = 2})
+	end })
+
+-- Camera
+Tabs.Movement:CreateSection("Camera")
+
+local freeCamEnabled   = false; local freeCamSpeed = 50; local freeCamConnection = nil
+local originalCameraSubject = nil
+
+Tabs.Movement:CreateToggle({ Name = "Free Cam", CurrentValue = false, Flag = "FreeCamToggle",
+	Callback = function(v)
+		freeCamEnabled = v
+		if v then
+			originalCameraSubject = Camera.CameraSubject
+			Camera.CameraType = Enum.CameraType.Scriptable
+			local rotX, rotY = 0, 0
+			local _, ry, rx = Camera.CFrame:ToEulerAnglesYXZ()
+			rotX = ry; rotY = rx
+			freeCamConnection = RunService.Heartbeat:Connect(function()
+				if not freeCamEnabled then return end
+				if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+					UserInputService.MouseBehavior = Enum.MouseBehavior.LockCurrentPosition
+					local delta = UserInputService:GetMouseDelta()
+					rotX = rotX - math.rad(delta.X * 0.3)
+					rotY = math.clamp(rotY - math.rad(delta.Y * 0.3), math.rad(-89), math.rad(89))
+				else
+					UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+				end
+				local newCFrame = CFrame.new(Camera.CFrame.Position) * CFrame.Angles(0, rotX, 0) * CFrame.Angles(rotY, 0, 0)
+				local moveDir = Vector3.zero
+				if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir += newCFrame.LookVector end
+				if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir -= newCFrame.LookVector end
+				if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir -= newCFrame.RightVector end
+				if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir += newCFrame.RightVector end
+				if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir += Vector3.new(0,1,0) end
+				if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then moveDir -= Vector3.new(0,1,0) end
+				local newPos = Camera.CFrame.Position
+				if moveDir.Magnitude > 0 then newPos = newPos + moveDir.Unit * (freeCamSpeed * 0.016) end
+				Camera.CFrame = CFrame.new(newPos) * CFrame.Angles(0, rotX, 0) * CFrame.Angles(rotY, 0, 0)
+			end)
+			Rayfield:Notify({Title = "Free Cam", Content = "Hold Right Mouse to look, WASD to move!", Duration = 4})
+		else
+			if freeCamConnection then freeCamConnection:Disconnect(); freeCamConnection = nil end
+			UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+			Camera.CameraType = Enum.CameraType.Custom
+			if originalCameraSubject then Camera.CameraSubject = originalCameraSubject end
+			Rayfield:Notify({Title = "Free Cam", Content = "Free cam disabled!", Duration = 2})
+		end
+	end })
+
+Tabs.Movement:CreateSlider({ Name = "Free Cam Speed", Range = {1,500}, Increment = 1, Suffix = "", CurrentValue = 50, Flag = "FreeCamSpeed",
+	Callback = function(v) freeCamSpeed = v end })
+
+-- Lock Camera
+Tabs.Movement:CreateSection("Lock Camera")
+
+local cameraLocked = false; local lockedCameraCFrame = nil
+local savedCameraSlots = {}; local selectedCameraSlot = 1
+
+Tabs.Movement:CreateDropdown({ Name = "Camera Save Slot", Options = {"Slot 1","Slot 2","Slot 3","Slot 4","Slot 5"}, CurrentOption = {"Slot 1"}, Flag = "CameraSlotDropdown",
+	Callback = function(o)
+		local n = tonumber(o[1]:match("%d+"))
+		selectedCameraSlot = n
+		Rayfield:Notify({Title = "Camera", Content = savedCameraSlots[n] and "Slot " .. n .. " has a position!" or "Slot " .. n .. " is empty.", Duration = 2})
+	end })
+
+Tabs.Movement:CreateButton({ Name = "Save Camera To Slot",
+	Callback = function()
+		savedCameraSlots[selectedCameraSlot] = Camera.CFrame
+		local p = Camera.CFrame.Position
+		Rayfield:Notify({Title = "Camera", Content = "Saved to slot " .. selectedCameraSlot .. "!", Duration = 3})
+	end })
+
+Tabs.Movement:CreateButton({ Name = "Teleport Camera To Slot",
+	Callback = function()
+		if not savedCameraSlots[selectedCameraSlot] then Rayfield:Notify({Title = "Camera", Content = "Slot empty!", Duration = 2}); return end
+		Camera.CameraType = Enum.CameraType.Scriptable
+		Camera.CFrame = savedCameraSlots[selectedCameraSlot]
+		Rayfield:Notify({Title = "Camera", Content = "Teleported camera!", Duration = 2})
+	end })
+
+Tabs.Movement:CreateButton({ Name = "Clear Slot",     Callback = function() savedCameraSlots[selectedCameraSlot] = nil; Rayfield:Notify({Title="Camera",Content="Slot cleared!",Duration=2}) end })
+Tabs.Movement:CreateButton({ Name = "Clear All Slots", Callback = function() savedCameraSlots = {}; Rayfield:Notify({Title="Camera",Content="All slots cleared!",Duration=2}) end })
+
+Tabs.Movement:CreateToggle({ Name = "Lock Camera To Slot Position", CurrentValue = false, Flag = "LockCameraToggle",
+	Callback = function(v)
+		cameraLocked = v
+		if v then
+			if not savedCameraSlots[selectedCameraSlot] then savedCameraSlots[selectedCameraSlot] = Camera.CFrame end
+			lockedCameraCFrame = savedCameraSlots[selectedCameraSlot]
+			Camera.CameraType = Enum.CameraType.Scriptable
+			connections["LockedCamera"] = RunService.Heartbeat:Connect(function()
+				if cameraLocked and lockedCameraCFrame then Camera.CFrame = lockedCameraCFrame end
+			end)
+			Rayfield:Notify({Title = "Camera", Content = "Camera locked!", Duration = 2})
+		else
+			if connections["LockedCamera"] then connections["LockedCamera"]:Disconnect(); connections["LockedCamera"] = nil end
+			Camera.CameraType = Enum.CameraType.Custom
+			Camera.CameraSubject = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+			Rayfield:Notify({Title = "Camera", Content = "Camera unlocked!", Duration = 2})
+		end
+	end })
+
+Tabs.Movement:CreateButton({ Name = "Reset Camera To Character",
+	Callback = function()
+		cameraLocked = false; freeCamEnabled = false
+		if freeCamConnection then freeCamConnection:Disconnect(); freeCamConnection = nil end
+		if connections["LockedCamera"] then connections["LockedCamera"]:Disconnect(); connections["LockedCamera"] = nil end
+		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+		Camera.CameraType = Enum.CameraType.Custom
+		Camera.CameraSubject = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+		Rayfield:Notify({Title = "Camera", Content = "Camera reset!", Duration = 2})
+	end })
+
+-- Freeze
+Tabs.Movement:CreateSection("Freeze")
+
+local freezeEnabled = false
+
+Tabs.Movement:CreateToggle({ Name = "Freeze Self", CurrentValue = false, Flag = "FreezeSelfToggle",
+	Callback = function(v)
+		freezeEnabled = v
+		pcall(function()
+			local root = getRoot(); local humanoid = getHumanoid()
+			if not root then return end
+			root.Anchored = v
+			if humanoid then
+				humanoid.WalkSpeed = v and 0 or (speedHackEnabled and speedHackValue or 16)
+				humanoid.JumpPower = v and 0 or (jumpPowerEnabled and jumpPowerValue or 50)
+			end
+		end)
+		Rayfield:Notify({Title = "Freeze", Content = v and "Frozen!" or "Unfrozen!", Duration = 2})
+	end })
+
+connections["FreezeSelf"] = RunService.Heartbeat:Connect(function()
+	if freezeEnabled then pcall(function()
+		local root = getRoot(); local humanoid = getHumanoid()
+		if root then root.Anchored = true end
+		if humanoid then humanoid.WalkSpeed = 0; humanoid.JumpPower = 0 end
+	end) end
+end)
+
+LocalPlayer.CharacterAdded:Connect(function()
+	task.wait(0.1)
+	if freezeEnabled then pcall(function()
+		local root = getRoot(); if root then root.Anchored = true end
+	end) end
+end)
+
+-- Ragdoll
+Tabs.Movement:CreateSection("Ragdoll")
+
+local ragdollEnabled = false
+
+local function setRagdoll(enabled)
+	pcall(function()
+		local character = getCharacter(); local humanoid = getHumanoid()
+		if not character or not humanoid then return end
+		if enabled then
+			humanoid:ChangeState(Enum.HumanoidStateType.Ragdoll)
+			for _, v in ipairs(character:GetDescendants()) do
+				if v:IsA("Motor6D") then v.Enabled = false end
+				if v:IsA("BasePart") then v.CanCollide = true end
+			end
+		else
+			humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+			for _, v in ipairs(character:GetDescendants()) do
+				if v:IsA("Motor6D") then v.Enabled = true end
+			end
+		end
+	end)
+end
+
+Tabs.Movement:CreateToggle({ Name = "Ragdoll", CurrentValue = false, Flag = "RagdollToggle",
+	Callback = function(v) ragdollEnabled = v; setRagdoll(v); Rayfield:Notify({Title="Ragdoll",Content=v and "Ragdoll enabled!" or "Ragdoll disabled!",Duration=2}) end })
+
+Tabs.Movement:CreateKeybind({ Name = "Ragdoll Keybind", CurrentKeybind = "R", HoldToInteract = false, Flag = "RagdollKeybind",
+	Callback = function() ragdollEnabled = not ragdollEnabled; setRagdoll(ragdollEnabled) end })
+
+-- Ice Physics
+Tabs.Movement:CreateSection("Ice Physics")
+
+local iceEnabled = false; local iceConnection = nil; local defaultFriction = {}
+
+local function applyIce(enabled)
+	pcall(function()
+		local character = getCharacter(); if not character then return end
+		for _, v in ipairs(character:GetDescendants()) do
+			if v:IsA("BasePart") then
+				if enabled then
+					defaultFriction[v] = { friction = (v.CustomPhysicalProperties and v.CustomPhysicalProperties.Friction) or 0.3 }
+					v.CustomPhysicalProperties = PhysicalProperties.new(0.01, 0.0, 0.0, 0.0, 0.0)
+				else
+					v.CustomPhysicalProperties = PhysicalProperties.new(0.3, (defaultFriction[v] and defaultFriction[v].friction) or 0.3, 0.5, 0.0, 0.0)
+				end
+			end
+		end
+	end)
+end
+
+Tabs.Movement:CreateToggle({ Name = "Ice Physics", CurrentValue = false, Flag = "IcePhysicsToggle",
+	Callback = function(v)
+		iceEnabled = v; applyIce(v)
+		if v then
+			iceConnection = RunService.Heartbeat:Connect(function() if iceEnabled then applyIce(true) end end)
+			Rayfield:Notify({Title = "Ice Physics", Content = "You will slide everywhere!", Duration = 3})
+		else
+			if iceConnection then iceConnection:Disconnect(); iceConnection = nil end
+			Rayfield:Notify({Title = "Ice Physics", Content = "Ice physics disabled!", Duration = 2})
+		end
+	end })
+
+LocalPlayer.CharacterAdded:Connect(function()
+	task.wait(0.5); defaultFriction = {}
+	if iceEnabled then applyIce(true) end
+	if ragdollEnabled then setRagdoll(true) end
+end)
+
+-- =====================
+-- PROTECTION TAB
+-- =====================
+
+Tabs.Protection:CreateSection("Anti-Aim")
+
+local antiAimEnabled = false; local antiAimMode = "Spin"; local antiAimSpeed = 10
+
+Tabs.Protection:CreateToggle({ Name = "Anti-Aim", CurrentValue = false, Flag = "AntiAimToggle",
+	Callback = function(v) antiAimEnabled = v end })
+Tabs.Protection:CreateDropdown({ Name = "Anti-Aim Mode", Options = {"Spin","Jitter","Random"}, CurrentOption = {"Spin"}, Flag = "AntiAimMode",
+	Callback = function(o) antiAimMode = o[1] end })
+Tabs.Protection:CreateSlider({ Name = "Spin Speed", Range = {1,50}, Increment = 1, Suffix = "", CurrentValue = 10, Flag = "AntiAimSpeed",
+	Callback = function(v) antiAimSpeed = v end })
+
+Tabs.Protection:CreateSection("Camera")
+
+local forceThirdPerson = false
+local originalCameraType = nil; local originalMaxZoom = nil; local originalMinZoom = nil
+
+Tabs.Protection:CreateToggle({ Name = "Force Third Person", CurrentValue = false, Flag = "ForceThirdPerson",
+	Callback = function(v)
+		forceThirdPerson = v
+		if v then
+			originalCameraType = LocalPlayer.CameraMode; originalMaxZoom = LocalPlayer.CameraMaxZoomDistance; originalMinZoom = LocalPlayer.CameraMinZoomDistance
+			LocalPlayer.CameraMode = Enum.CameraMode.Classic; LocalPlayer.CameraMaxZoomDistance = 50; LocalPlayer.CameraMinZoomDistance = 5
+		else
+			LocalPlayer.CameraMode = originalCameraType or Enum.CameraMode.Classic
+			LocalPlayer.CameraMaxZoomDistance = originalMaxZoom or 128; LocalPlayer.CameraMinZoomDistance = originalMinZoom or 0.5
+		end
+		Rayfield:Notify({Title = "Camera", Content = v and "Third Person Enabled!" or "Third Person Disabled!", Duration = 2})
+	end })
+
+Tabs.Protection:CreateSection("God Mode")
+
+local godModeEnabled = false; local godModeConnection = nil; local damageMeta = nil; local godModeHealthOverride = 100
+
+Tabs.Protection:CreateToggle({ Name = "God Mode (Doesn't Work 90% of games)", CurrentValue = false, Flag = "GodModeToggle",
+	Callback = function(v)
+		godModeEnabled = v
+		if v then
+			pcall(function()
+				local humanoid = getHumanoid()
+				if humanoid then
+					damageMeta = hookmetamethod(game, "__namecall", function(self, ...)
+						local method = getnamecallmethod()
+						if method == "TakeDamage" and self == humanoid then return end
+						return damageMeta(self, ...)
+					end)
+				end
+			end)
+			godModeConnection = RunService.Heartbeat:Connect(function()
+				pcall(function()
+					local humanoid = getHumanoid()
+					if humanoid then humanoid.MaxHealth = godModeHealthOverride; humanoid.Health = godModeHealthOverride end
+				end)
+			end)
+		else
+			if godModeConnection then godModeConnection:Disconnect(); godModeConnection = nil end
+		end
+		Rayfield:Notify({Title = "God Mode", Content = v and "God Mode Enabled!" or "God Mode Disabled!", Duration = 2})
+	end })
+
+Tabs.Protection:CreateSlider({ Name = "Max Health Override", Range = {100,1000000}, Increment = 100, Suffix = " HP", CurrentValue = 100, Flag = "GodModeHealthOverride",
+	Callback = function(v)
+		godModeHealthOverride = v
+		pcall(function()
+			local humanoid = getHumanoid()
+			if humanoid then
+				humanoid.MaxHealth = v
+				if godModeEnabled then humanoid.Health = v end
+			end
+		end)
+	end })
+
+Tabs.Protection:CreateButton({ Name = "Reset Health Values",
+	Callback = function()
+		pcall(function()
+			local humanoid = getHumanoid()
+			if humanoid then humanoid.MaxHealth = 100; humanoid.Health = 100; godModeHealthOverride = 100 end
+		end)
+		Rayfield:Notify({Title = "Health", Content = "Health reset!", Duration = 2})
+	end })
+
+connections["ProtectionLoop"] = RunService.Heartbeat:Connect(function()
+	if forceThirdPerson then
+		if LocalPlayer.CameraMode ~= Enum.CameraMode.Classic then LocalPlayer.CameraMode = Enum.CameraMode.Classic end
+		if LocalPlayer.CameraMaxZoomDistance < 20 then LocalPlayer.CameraMaxZoomDistance = 50 end
+		if LocalPlayer.CameraMinZoomDistance > 10 then LocalPlayer.CameraMinZoomDistance = 5 end
+	end
+	if antiAimEnabled then
+		pcall(function()
+			local root = getRoot()
+			if root then
+				if antiAimMode == "Spin" then
+					root.CFrame = root.CFrame * CFrame.Angles(0, math.rad(antiAimSpeed), 0)
+				elseif antiAimMode == "Jitter" then
+					root.CFrame = root.CFrame * CFrame.Angles(0, math.rad(math.random(-180,180)), 0)
+				elseif antiAimMode == "Random" then
+					root.CFrame = root.CFrame * CFrame.Angles(math.rad(math.random(-5,5)), math.rad(math.random(-180,180)), math.rad(math.random(-5,5)))
+				end
+			end
+		end)
+	end
+end)
+
+-- =====================
+-- EXTRAS TAB
+-- =====================
+
+Tabs.Extras:CreateSection("FPS & Performance")
+
+Tabs.Extras:CreateToggle({ Name = "FPS Boost", CurrentValue = false, Flag = "FPSBoostToggle",
+	Callback = function(v)
+		if v then
+			pcall(function()
+				Lighting.GlobalShadows = false; Lighting.FogEnd = 9e9
+				settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+				for _, obj in pairs(workspace:GetDescendants()) do
+					if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Smoke") or obj:IsA("Fire") then obj.Enabled = false end
+				end
+			end)
+		else
+			pcall(function()
+				Lighting.GlobalShadows = true
+				settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic
+			end)
+		end
+		Rayfield:Notify({Title = "FPS", Content = v and "FPS Boost Enabled!" or "FPS Boost Disabled!", Duration = 2})
+	end })
+
+Tabs.Extras:CreateButton({ Name = "Remove Textures (Extreme FPS)",
+	Callback = function()
+		for _, v in pairs(workspace:GetDescendants()) do
+			pcall(function()
+				if v:IsA("Decal") or v:IsA("Texture") then v:Destroy()
+				elseif v:IsA("BasePart") then v.Material = Enum.Material.SmoothPlastic; v.Reflectance = 0 end
+			end)
+		end
+		Rayfield:Notify({Title = "FPS", Content = "Textures removed!", Duration = 3})
+	end })
+
+Tabs.Extras:CreateSection("Lighting")
+
+Tabs.Extras:CreateButton({ Name = "Fullbright",
+	Callback = function()
+		Lighting.Brightness = 2; Lighting.ClockTime = 14; Lighting.FogEnd = 100000
+		Lighting.GlobalShadows = false; Lighting.OutdoorAmbient = Color3.fromRGB(128,128,128)
+		Rayfield:Notify({Title = "Visuals", Content = "Fullbright Enabled!", Duration = 3})
+	end })
+
+Tabs.Extras:CreateButton({ Name = "Remove Fog",
+	Callback = function()
+		Lighting.FogEnd = 100000
+		for _, v in pairs(Lighting:GetChildren()) do
+			if v:IsA("Atmosphere") then v:Destroy() end
+		end
+		Rayfield:Notify({Title = "Visuals", Content = "Fog Removed!", Duration = 3})
+	end })
+
+-- =====================
+-- SCRIPTS TAB
+-- =====================
+
+Tabs.Yield:CreateSection("Utility")
+
+Tabs.Yield:CreateToggle({ Name = "Infinite Yield", CurrentValue = false, Flag = "InfYieldToggle",
+	Callback = function(v)
+		if v then
+			loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source', true))()
+			Rayfield:Notify({Title = "Scripts", Content = "Infinite Yield enabled!", Duration = 2})
+		end
+	end })
+
+Tabs.Yield:CreateButton({ Name = "Soluna", Callback = function()
+	loadstring(game:HttpGet("https://raw.githubusercontent.com/EndOverdosing/Soluna-API/refs/heads/main/universal.lua", true))()
+	Rayfield:Notify({Title = "Scripts", Content = "Soluna launched!", Duration = 2})
+end })
+
+Tabs.Yield:CreateButton({ Name = "ZEUS", Callback = function()
+	loadstring(game:HttpGet("https://pastebin.com/raw/zWhb1mMS"))()
+	Rayfield:Notify({Title = "Scripts", Content = "Zeus launched!", Duration = 2})
+end })
+
+Tabs.Yield:CreateSection("Game Scripts")
+
+Tabs.Yield:CreateButton({ Name = "Dead Rails",         Callback = function() loadstring(game:HttpGet("https://rawscripts.net/raw/Dead-Rails-Beta-Best-keyless-free-script-Auto-bonds-infinite-item-193503"))() Rayfield:Notify({Title="Scripts",Content="Dead Rails launched!",Duration=2}) end })
+Tabs.Yield:CreateButton({ Name = "XVC Script Hub",     Callback = function() loadstring(game:HttpGet("https://pastebin.com/raw/Piw5bqGq"))() Rayfield:Notify({Title="Scripts",Content="XVC Hub launched!",Duration=2}) end })
+Tabs.Yield:CreateButton({ Name = "99 Nights In The Forest", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/VapeVoidware/VW-Add/main/loader.lua", true))() Rayfield:Notify({Title="Scripts",Content="99 Nights launched!",Duration=2}) end })
+Tabs.Yield:CreateButton({ Name = "Spiem Hub",          Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/perfectusmim1/spiemhub/refs/heads/main/loader"))() Rayfield:Notify({Title="Scripts",Content="Spiem Hub launched!",Duration=2}) end })
+Tabs.Yield:CreateButton({ Name = "Blox Fruits",        Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/RichKidz-PX/RichKidz/main/FarmMoney.lua"))() Rayfield:Notify({Title="Scripts",Content="Blox Fruits launched!",Duration=2}) end })
+Tabs.Yield:CreateButton({ Name = "Brookhaven",         Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/bruton-lua-sources/LOC4T-HUB/refs/heads/main/LOC4T%20HUB"))() Rayfield:Notify({Title="Scripts",Content="Brookhaven launched!",Duration=2}) end })
+
+Tabs.Yield:CreateSection("URL Executor")
+
+local urlInput = ""
+
+Tabs.Yield:CreateInput({ Name = "Script URL", PlaceholderText = "https://raw.githubusercontent.com/...", RemoveTextAfterFocusLost = false, Flag = "URLExecutorInput",
+	Callback = function(v) urlInput = v end })
+
+Tabs.Yield:CreateButton({ Name = "Execute URL",
+	Callback = function()
+		if urlInput == "" then Rayfield:Notify({Title = "URL Executor", Content = "No URL entered!", Duration = 2}); return end
+		if not urlInput:match("^https?://") then Rayfield:Notify({Title = "URL Executor", Content = "Invalid URL!", Duration = 3}); return end
+		local ok, err = pcall(function() loadstring(game:HttpGet(urlInput, true))() end)
+		Rayfield:Notify({Title = "URL Executor", Content = ok and "Executed successfully!" or "Failed: " .. tostring(err), Duration = ok and 3 or 5})
+	end })
+
+Tabs.Yield:CreateSection("Lua Executor")
+
+local luaInput = ""
+
+Tabs.Yield:CreateInput({ Name = "Lua Code", PlaceholderText = "print('Hello World')", RemoveTextAfterFocusLost = false, Flag = "LuaExecutorInput",
+	Callback = function(v) luaInput = v end })
+
+Tabs.Yield:CreateButton({ Name = "Execute Lua",
+	Callback = function()
+		if luaInput == "" then Rayfield:Notify({Title = "Lua Executor", Content = "No code entered!", Duration = 2}); return end
+		local fn, compErr = loadstring(luaInput)
+		if not fn then Rayfield:Notify({Title = "Lua Executor", Content = "Compile error: " .. tostring(compErr), Duration = 5}); return end
+		local ok, rErr = pcall(fn)
+		Rayfield:Notify({Title = "Lua Executor", Content = ok and "Executed!" or "Runtime error: " .. tostring(rErr), Duration = ok and 3 or 5})
+	end })
+
+-- =====================
+-- UI SETTINGS TAB
+-- =====================
+
+Tabs.Ui:CreateSection("Preset Colors")
+
+local currentUIColor    = Color3.fromRGB(255,255,255)
+local rainbowUIEnabled  = false
+local rainbowUIConnection = nil
+
+local function applyUIColor(color)
+	pcall(function() Rayfield:SetAccentColor(color) end)
+	for _, text in pairs(espTexts) do pcall(function() if text then text.Color = color end end) end
+	for _, box  in pairs(espBoxes)  do pcall(function() if box  then box.Color  = color end end) end
+	for _, cham in pairs(espChams)  do pcall(function()
+		if cham then cham.FillColor = color; cham.OutlineColor = color end
+	end) end
+	pcall(function() fovCircle.Color = color end)
+end
+
+local uiColors = {
+	White = Color3.fromRGB(255,255,255), Red    = Color3.fromRGB(255,50,50),
+	Green = Color3.fromRGB(50,255,100),  Blue   = Color3.fromRGB(50,150,255),
+	Purple= Color3.fromRGB(180,50,255),  Pink   = Color3.fromRGB(255,100,200),
+	Orange= Color3.fromRGB(255,150,50),  Yellow = Color3.fromRGB(255,220,50),
+	Cyan  = Color3.fromRGB(50,220,255),
+}
+
+Tabs.Ui:CreateDropdown({ Name = "Preset Color", Options = {"White","Red","Green","Blue","Purple","Pink","Orange","Yellow","Cyan","Rainbow"}, CurrentOption = {"White"}, Flag = "UIColorDropdown",
+	Callback = function(o)
+		local picked = o[1]
+		if picked == "Rainbow" then
+			rainbowUIEnabled = true
+			if rainbowUIConnection then rainbowUIConnection:Disconnect() end
+			rainbowUIConnection = RunService.Heartbeat:Connect(function()
+				if rainbowUIEnabled then applyUIColor(Color3.fromHSV(tick() % 5 / 5, 1, 1)) end
+			end)
+		else
+			rainbowUIEnabled = false
+			if rainbowUIConnection then rainbowUIConnection:Disconnect(); rainbowUIConnection = nil end
+			local color = uiColors[picked]
+			if color then currentUIColor = color; applyUIColor(color) end
+		end
+		Rayfield:Notify({Title = "UI Color", Content = "Color: " .. picked, Duration = 2})
+	end })
+
+Tabs.Ui:CreateSection("Custom RGB")
+
+local rVal, gVal, bVal = 255, 255, 255
+
+local function applyRGB()
+	rainbowUIEnabled = false
+	if rainbowUIConnection then rainbowUIConnection:Disconnect(); rainbowUIConnection = nil end
+	currentUIColor = Color3.fromRGB(rVal, gVal, bVal)
+	applyUIColor(currentUIColor)
+end
+
+Tabs.Ui:CreateSlider({ Name = "Red",   Range = {0,255}, Increment = 1, Suffix = "", CurrentValue = 255, Flag = "UIColorR", Callback = function(v) rVal = v; applyRGB() end })
+Tabs.Ui:CreateSlider({ Name = "Green", Range = {0,255}, Increment = 1, Suffix = "", CurrentValue = 255, Flag = "UIColorG", Callback = function(v) gVal = v; applyRGB() end })
+Tabs.Ui:CreateSlider({ Name = "Blue",  Range = {0,255}, Increment = 1, Suffix = "", CurrentValue = 255, Flag = "UIColorB", Callback = function(v) bVal = v; applyRGB() end })
+
+Tabs.Ui:CreateSection("Options")
+Tabs.Ui:CreateButton({ Name = "Apply Color to ESP", Callback = function() applyUIColor(currentUIColor); Rayfield:Notify({Title="UI Color",Content="Color applied!",Duration=2}) end })
+Tabs.Ui:CreateButton({ Name = "Reset to Default",
+	Callback = function()
+		rainbowUIEnabled = false
+		if rainbowUIConnection then rainbowUIConnection:Disconnect(); rainbowUIConnection = nil end
+		rVal, gVal, bVal = 255, 255, 255; currentUIColor = Color3.fromRGB(255,255,255); applyUIColor(currentUIColor)
+		Rayfield:Notify({Title="UI Color",Content="Reset to white!",Duration=2})
+	end })
+
+-- =====================
+-- PANIC TAB
+-- =====================
+
+Tabs.Panic:CreateSection("Keybind")
+
+Tabs.Panic:CreateKeybind({ Name = "Panic Key (Toggle GUI)", CurrentKeybind = "RightAlt", HoldToInteract = false, Flag = "PanicKeybind",
+	Callback = function()
+		local gui = game.CoreGui:FindFirstChild("Rayfield")
+		if gui then gui.Enabled = not gui.Enabled end
+	end })
+
+Tabs.Panic:CreateSection("GUI Visibility")
+
+Tabs.Panic:CreateButton({ Name = "Hide GUI + All ESP",
+	Callback = function()
+		local gui = game.CoreGui:FindFirstChild("Rayfield")
+		if gui then gui.Enabled = false end
+		for _, box  in pairs(espBoxes)  do pcall(function() if box  then box.Visible  = false end end) end
+		for _, text in pairs(espTexts)  do pcall(function() if text then text.Visible = false end end) end
+		for _, cham in pairs(espChams)  do pcall(function() if cham then cham.Enabled = false end end) end
+		if skeletonLines then
+			for _, data in pairs(skeletonLines) do pcall(function()
+				if data.lines then for _, l in pairs(data.lines) do l.Visible = false end end
+				if data.tracer then data.tracer.Visible = false end
+			end) end
+		end
+		fovCircle.Visible = false
+	end })
+
+Tabs.Panic:CreateButton({ Name = "Show GUI Again",
+	Callback = function()
+		local gui = game.CoreGui:FindFirstChild("Rayfield")
+		if gui then gui.Enabled = true; Rayfield:Notify({Title="Panic",Content="GUI restored!",Duration=2}) end
+	end })
+
+Tabs.Panic:CreateSection("Nuclear Option")
+
+Tabs.Panic:CreateButton({ Name = "Disconnect From Server",
+	Callback = function() TeleportService:Teleport(game.PlaceId, LocalPlayer) end })
+
+-- =====================
+-- MATTHEW'S BIRTHDAY TAB
+-- =====================
+
+Tabs.Birth:CreateSection("Matthews Birthday Celebration 🎂")
+
+local birthdayLabel = Drawing.new("Text")
+birthdayLabel.Visible = false; birthdayLabel.Color = Color3.new(0, 225/255, 225/255)
+birthdayLabel.Size = 100; birthdayLabel.Center = true; birthdayLabel.Outline = true
+birthdayLabel.Transparency = 1; birthdayLabel.Text = "🎊🎊 Happy Birthday Matthew! 🎊🎊"
+
+Tabs.Birth:CreateToggle({ Name = "Show Happy Birthday Message", CurrentValue = false, Flag = "BirthdayMessageToggle",
+	Callback = function(v) birthdayLabel.Visible = v end })
+
+connections["BirthdayMessagePosition"] = RunService.RenderStepped:Connect(function()
+	if birthdayLabel.Visible then
+		birthdayLabel.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+	end
+end)
+
+-- =====================
+-- STARTUP
+-- =====================
+
+Rayfield:Notify({
+	Title = "Bitch Nigga Loaded!",
+	Content = "All features loaded. For Me, Matthew and Noah 🙄",
+	Duration = 5,
+})
